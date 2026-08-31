@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Covers Download/Video Downloads on shared storage -->
+    <external-path name="shared" path="." />
+    <external-files-path name="app_external" path="." />
+    <cache-path name="cache" path="." />
+</paths>

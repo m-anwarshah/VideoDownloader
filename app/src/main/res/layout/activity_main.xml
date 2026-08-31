@@ -53,7 +53,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
 
-        <Switch
+        <androidx.appcompat.widget.SwitchCompat
             android:id="@+id/dataSwitch"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -92,12 +92,94 @@
             android:text="Starting..."
             android:textSize="12sp" />
 
+        <!-- Shown once a file is on the phone -->
+        <LinearLayout
+            android:id="@+id/resultCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:orientation="vertical"
+            android:padding="12dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Saved in Download/Video Downloads"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/resultName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textStyle="bold"
+                android:textSize="14sp"
+                android:maxLines="3"
+                android:ellipsize="middle" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/playBtn"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="Play video" />
+
+                <Button
+                    android:id="@+id/shareBtn"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="Share" />
+            </LinearLayout>
+        </LinearLayout>
+
         <Button
             android:id="@+id/updateBtn"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
             android:text="Update engine (yt-dlp)" />
+
+        <!-- Contact and donations -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="28dp"
+            android:background="?android:attr/listDivider" />
+
+        <TextView
+            android:id="@+id/supportText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:textSize="13sp"
+            android:autoLink="email"
+            android:lineSpacingExtra="3dp" />
+
+        <Button
+            android:id="@+id/emailBtn"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textAllCaps="false"
+            android:text="Send email" />
+
+        <Button
+            android:id="@+id/donateBtn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textAllCaps="false"
+            android:text="Donate" />
 
     </LinearLayout>
 </ScrollView>
