@@ -21,11 +21,22 @@ jobs:
         with:
           gradle-version: "8.7"
 
-      - name: Build debug APK
+      - name: Build debug APKs
         run: gradle assembleDebug
 
-      - name: Upload APK
+      - name: Show APK sizes
+        run: ls -lh app/build/outputs/apk/debug/*.apk
+
+      # Most phones from 2015 onward. Install this one.
+      - name: Upload arm64 APK
         uses: actions/upload-artifact@v4
         with:
-          name: VideoDownloader-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: VideoDownloader-arm64
+          path: app/build/outputs/apk/debug/*arm64-v8a*.apk
+
+      # Older 32-bit phones only
+      - name: Upload arm32 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: VideoDownloader-arm32
+          path: app/build/outputs/apk/debug/*armeabi-v7a*.apk
