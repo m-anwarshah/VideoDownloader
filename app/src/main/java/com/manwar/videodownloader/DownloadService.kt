@@ -120,17 +120,21 @@ class DownloadService : Service() {
 
                 updateNotification("Downloading...", 0)
 
-                val request = buildRequest(url, quality, fmt, useAria2, outDir)
-                YoutubeDL.getInstance()
-                    .execute(request, currentProcessId) { progress, _, line ->
-                        scanForOutputPath(line)
-                        val pct = if (progress >= 0) progress.toInt() else lastPct
-                        if (pct != lastPct) {
-                            lastPct = pct
-                            updateNotification("Downloading  $pct%", pct)
-                        }
-                        progressListener?.invoke(pct, line)
+                try {
+                    runYoutubeDl(url, quality, fmt, useAria2, outDir)
+                } catch (e: Exception) {
+                    // aria2c is the accelerator, not the downloader of last
+                    // resort. If it chokes on a file it cannot create, retry
+                    // once with the built-in downloader instead of failing.
+                    if (useAria2 && !stoppedByNetwork && isAccelerationFailure(e)) {
+                        lastPct = -1
+                        updateNotification("Retrying without accelerator...", 0)
+                        progressListener?.invoke(0, "Accelerator failed — retrying")
+                        runYoutubeDl(url, quality, fmt, false, outDir)
+                    } else {
+                        throw e
                     }
+                }
 
                 val saved = resolveSavedFile(outDir)
                 if (saved != null) {
@@ -164,6 +168,29 @@ class DownloadService : Service() {
             }
         }
         return START_NOT_STICKY
+    }
+
+    // ---------- running yt-dlp ----------
+
+    private fun runYoutubeDl(
+        url: String, quality: String, fmt: String, useAria2: Boolean, outDir: File
+    ) {
+        val request = buildRequest(url, quality, fmt, useAria2, outDir)
+        YoutubeDL.getInstance().execute(request, currentProcessId) { progress, _, line ->
+            scanForOutputPath(line)
+            val pct = if (progress >= 0) progress.toInt() else lastPct
+            if (pct != lastPct) {
+                lastPct = pct
+                updateNotification("Downloading  $pct%", pct)
+            }
+            progressListener?.invoke(pct, line)
+        }
+    }
+
+    /** True when the failure looks like aria2c rather than the site or network. */
+    private fun isAccelerationFailure(e: Exception): Boolean {
+        val msg = (e.message ?: "").lowercase()
+        return msg.contains("aria2") || msg.contains("external downloader")
     }
 
     // ---------- duplicate detection ----------
@@ -285,7 +312,11 @@ class DownloadService : Service() {
 
         val request = YoutubeDLRequest(url)
         request.addOption("--no-playlist")
-        request.addOption("-o", "${outDir.absolutePath}/%(title).150s.%(ext)s")
+        // 50 characters. Even at 4 bytes per character (emoji, Urdu, Arabic)
+        // that is 200 bytes, comfortably inside Android's 255-byte filename
+        // limit once the extension and any .partN suffix are added.
+        request.addOption("-o", "${outDir.absolutePath}/%(title).50s.%(ext)s")
+        request.addOption("--trim-filenames", "200")
         request.addOption("--socket-timeout", "15")
         request.addOption("--retries", "10")
         request.addOption("--fragment-retries", "10")
