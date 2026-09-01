@@ -13,22 +13,13 @@ android {
         targetSdk 34
         versionCode 3
         versionName "1.2"
-        ndk {
-            abiFilters 'armeabi-v7a', 'arm64-v8a'
-        }
-        resourceConfigurations += ['en']
-        vectorDrawables.useSupportLibrary = true
-    }
 
-    // One APK per CPU architecture instead of one fat APK carrying both.
-    // Python, ffmpeg and aria2c are compiled per-ABI, so a combined APK
-    // holds two copies of everything and each phone uses only one.
-    splits {
-        abi {
-            enable true
-            reset()
-            include 'armeabi-v7a', 'arm64-v8a'
-            universalApk false
+        // Build for 64-bit ARM only. Python, ffmpeg and aria2c are compiled
+        // per-architecture, so including a second one would roughly double
+        // the APK for binaries no single phone ever uses. arm64 covers
+        // effectively every phone from 2015 onward.
+        ndk {
+            abiFilters 'arm64-v8a'
         }
     }
 
@@ -37,22 +28,9 @@ android {
             // yt-dlp needs the Python binary on disk, so extraction stays on
             useLegacyPackaging = true
         }
-        resources {
-            excludes += [
-                'META-INF/*.kotlin_module',
-                'META-INF/DEPENDENCIES',
-                'META-INF/LICENSE*',
-                'META-INF/NOTICE*',
-                'DebugProbesKt.bin',
-                'kotlin-tooling-metadata.json'
-            ]
-        }
     }
 
     buildTypes {
-        debug {
-            // Left unshrunk so builds are fast and always work
-        }
         release {
             minifyEnabled true
             shrinkResources true
@@ -62,10 +40,6 @@ android {
             // before putting this on the Play Store
             signingConfig signingConfigs.debug
         }
-    }
-
-    buildFeatures {
-        viewBinding false
     }
 
     compileOptions {
@@ -81,14 +55,14 @@ dependencies {
     def ytdlp = "0.18.1"
     implementation "io.github.junkfood02.youtubedl-android:library:$ytdlp"
     // ffmpeg merges separate video and audio streams — required for YouTube
-    // above 720p. Removing it saves ~25-30 MB per ABI but caps quality.
+    // above 720p
     implementation "io.github.junkfood02.youtubedl-android:ffmpeg:$ytdlp"
     // aria2c is the speed accelerator (16 parallel connections)
     implementation "io.github.junkfood02.youtubedl-android:aria2c:$ytdlp"
 
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'androidx.core:core-ktx:1.12.0'
-    // Cards, chips, switches, text fields and the progress bar in the new UI
+    // Cards, chips, switches, text fields and the progress bar in the UI
     implementation 'com.google.android.material:material:1.11.0'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
