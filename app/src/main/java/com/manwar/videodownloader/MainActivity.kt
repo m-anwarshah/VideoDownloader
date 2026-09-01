@@ -1,26 +1,27 @@
 package com.manwar.videodownloader
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.View
-import android.widget.ArrayAdapter
-import android.widget.Button
-import android.widget.CheckBox
-import android.widget.EditText
-import android.widget.ProgressBar
-import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.SwitchCompat
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
+import com.google.android.material.chip.ChipGroup
+import com.google.android.material.materialswitch.MaterialSwitch
+import com.google.android.material.progressindicator.LinearProgressIndicator
+import com.google.android.material.textfield.TextInputEditText
 import com.yausername.youtubedl_android.YoutubeDL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -32,32 +33,30 @@ class MainActivity : AppCompatActivity() {
     companion object {
         // Contact address shown in the support section
         const val SUPPORT_EMAIL = "video.downloader.github@gmail.com"
-        // Optional: a donation page. Leave blank to hide the Donate button.
+        // Optional donation page. Leave blank to hide the Donate button.
         const val DONATE_URL = ""
     }
 
-    private lateinit var urlInput: EditText
-    private lateinit var qualitySpinner: Spinner
-    private lateinit var formatSpinner: Spinner
-    private lateinit var aria2Check: CheckBox
-    private lateinit var dataSwitch: SwitchCompat
-    private lateinit var downloadBtn: Button
-    private lateinit var updateBtn: Button
-    private lateinit var progressBar: ProgressBar
+    private lateinit var urlInput: TextInputEditText
+    private lateinit var pasteBtn: TextView
+    private lateinit var qualityChips: ChipGroup
+    private lateinit var formatChips: ChipGroup
+    private lateinit var formatLabel: TextView
+    private lateinit var aria2Switch: MaterialSwitch
+    private lateinit var dataSwitch: MaterialSwitch
+    private lateinit var downloadBtn: MaterialButton
+    private lateinit var updateBtn: MaterialButton
+    private lateinit var progressBar: LinearProgressIndicator
     private lateinit var statusText: TextView
 
-    private lateinit var resultCard: View
+    private lateinit var resultCard: MaterialCardView
     private lateinit var resultName: TextView
-    private lateinit var playBtn: Button
-    private lateinit var shareBtn: Button
+    private lateinit var playBtn: MaterialButton
+    private lateinit var shareBtn: MaterialButton
 
     private lateinit var supportText: TextView
-    private lateinit var emailBtn: Button
-    private lateinit var donateBtn: Button
-
-    private val qualities =
-        arrayOf("Best available", "1080p", "720p", "480p", "360p", "Audio only (MP3)")
-    private val formats = arrayOf("MP4", "MKV")
+    private lateinit var emailBtn: MaterialButton
+    private lateinit var donateBtn: MaterialButton
 
     private val urlRegex = Regex("""https?://\S+""")
 
@@ -68,10 +67,16 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         urlInput = findViewById(R.id.urlInput)
-        qualitySpinner = findViewById(R.id.qualitySpinner)
-        formatSpinner = findViewById(R.id.formatSpinner)
-        aria2Check = findViewById(R.id.aria2Check)
+        pasteBtn = findViewById(R.id.pasteBtn)
+        qualityChips = findViewById(R.id.qualityChips)
+        formatChips = findViewById(R.id.formatChips)
+        formatLabel = findViewById(R.id.formatLabel)
+        aria2Switch = findViewById(R.id.aria2Check)
         dataSwitch = findViewById(R.id.dataSwitch)
+        downloadBtn = findViewById(R.id.downloadBtn)
+        updateBtn = findViewById(R.id.updateBtn)
+        progressBar = findViewById(R.id.progressBar)
+        statusText = findViewById(R.id.statusText)
 
         resultCard = findViewById(R.id.resultCard)
         resultName = findViewById(R.id.resultName)
@@ -87,18 +92,14 @@ class MainActivity : AppCompatActivity() {
         dataSwitch.setOnCheckedChangeListener { _, checked ->
             prefs.edit().putBoolean("allow_data", checked).apply()
         }
-        downloadBtn = findViewById(R.id.downloadBtn)
-        updateBtn = findViewById(R.id.updateBtn)
-        progressBar = findViewById(R.id.progressBar)
-        statusText = findViewById(R.id.statusText)
 
-        qualitySpinner.adapter =
-            ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, qualities)
-        formatSpinner.adapter =
-            ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, formats)
+        // MP3 has no container choice, so hide the file type row for it
+        qualityChips.setOnCheckedStateChangeListener { _, _ -> syncFormatVisibility() }
+        syncFormatVisibility()
 
         downloadBtn.setOnClickListener { startDownload() }
         updateBtn.setOnClickListener { updateEngine() }
+        pasteBtn.setOnClickListener { pasteFromClipboard() }
         playBtn.setOnClickListener { shownFile?.let { Opener.open(this, it) } }
         shareBtn.setOnClickListener { shownFile?.let { Opener.share(this, it) } }
 
@@ -117,13 +118,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Receive live progress from the background service while visible
         DownloadService.progressListener = { pct, line ->
             runOnUiThread { onProgress(pct, line) }
         }
-        if (DownloadService.isRunning) {
-            status("Download running in background...")
-        }
+        if (DownloadService.isRunning) status("Download running in background...")
         showFinishedFile(DownloadService.completedFile ?: History.lastFile(this))
     }
 
@@ -132,6 +130,28 @@ class MainActivity : AppCompatActivity() {
         super.onPause()
     }
 
+    // ---------- selection ----------
+
+    private fun selectedQuality(): String = when (qualityChips.checkedChipId) {
+        R.id.chip1080 -> "1080p"
+        R.id.chip720 -> "720p"
+        R.id.chip480 -> "480p"
+        R.id.chip360 -> "360p"
+        R.id.chipMp3 -> "Audio only (MP3)"
+        else -> "Best available"
+    }
+
+    private fun selectedFormat(): String =
+        if (formatChips.checkedChipId == R.id.chipMkv) "MKV" else "MP4"
+
+    private fun syncFormatVisibility() {
+        val audio = qualityChips.checkedChipId == R.id.chipMp3
+        formatLabel.visibility = if (audio) View.GONE else View.VISIBLE
+        formatChips.visibility = if (audio) View.GONE else View.VISIBLE
+    }
+
+    // ---------- progress ----------
+
     private fun onProgress(pct: Int, line: String) {
         when (pct) {
             DownloadService.PROGRESS_DUPLICATE -> {
@@ -139,22 +159,18 @@ class MainActivity : AppCompatActivity() {
                 status("Already downloaded: ${file.name}")
                 showFinishedFile(file)
             }
-            DownloadService.PROGRESS_FAILED -> {
-                status(line.take(140))
-            }
+            DownloadService.PROGRESS_FAILED -> status(line.take(140))
             100 -> {
-                progressBar.progress = 100
+                progressBar.setProgressCompat(100, true)
                 status(line.take(140))
                 showFinishedFile(DownloadService.completedFile)
             }
             else -> {
-                if (pct in 0..100) progressBar.progress = pct
+                if (pct in 0..100) progressBar.setProgressCompat(pct, true)
                 statusText.text = line.take(140)
             }
         }
     }
-
-    // ---------- finished file ----------
 
     private fun showFinishedFile(file: File?) {
         if (file == null || !file.exists()) {
@@ -164,7 +180,7 @@ class MainActivity : AppCompatActivity() {
         }
         shownFile = file
         resultName.text = file.name
-        playBtn.text = if (History.isAudio(file)) "Play audio" else "Play video"
+        playBtn.text = if (History.isAudio(file)) "Play" else "Play"
         resultCard.visibility = View.VISIBLE
     }
 
@@ -172,9 +188,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun setUpSupportSection() {
         supportText.text =
-            "Made by Anwar Shah. If the app is useful to you, a small donation keeps it " +
-            "free and updated. Bug reports and feature requests are welcome too.\n\n" +
-            SUPPORT_EMAIL
+            "Made by Anwar Shah. This app is free and has no ads. If it saves you " +
+            "time, a small donation keeps it updated.\n\n$SUPPORT_EMAIL"
 
         emailBtn.setOnClickListener {
             val mail = Intent(Intent.ACTION_SENDTO).apply {
@@ -202,9 +217,24 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun clipboard() = getSystemService(ClipboardManager::class.java)
+
     private fun copyToClipboard(text: String) {
-        val cm = getSystemService(android.content.ClipboardManager::class.java)
-        cm.setPrimaryClip(android.content.ClipData.newPlainText("email", text))
+        clipboard().setPrimaryClip(ClipData.newPlainText("email", text))
+    }
+
+    private fun pasteFromClipboard() {
+        val clip = clipboard().primaryClip
+        val text = if (clip != null && clip.itemCount > 0) {
+            clip.getItemAt(0).coerceToText(this).toString()
+        } else ""
+        val url = urlRegex.find(text)?.value
+        if (url == null) {
+            toast("No link found in clipboard")
+            return
+        }
+        urlInput.setText(url)
+        status("Link pasted. Pick a quality and hit Download.")
     }
 
     // ---------- existing behaviour ----------
@@ -217,7 +247,7 @@ class MainActivity : AppCompatActivity() {
         } ?: return
         val url = urlRegex.find(text)?.value ?: return
         urlInput.setText(url)
-        status("Link received. Choose quality and press Download.")
+        status("Link received. Pick a quality and hit Download.")
     }
 
     private fun requestPermissionsIfNeeded() {
@@ -243,26 +273,24 @@ class MainActivity : AppCompatActivity() {
 
     private fun initEngine() {
         if (Engine.ready) {
-            status("Ready. Share a link here or paste it above.")
+            status("Ready. Paste a link or share one to this app.")
             return
         }
-        status("Preparing download engine (first time takes a minute)...")
+        status("Getting ready (first time takes a minute)...")
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 Engine.init(this@MainActivity)
                 withContext(Dispatchers.Main) {
-                    status("Ready. Share a link here or paste it above.")
+                    status("Ready. Paste a link or share one to this app.")
                 }
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    status("Engine init failed: ${e.message}")
-                }
+                withContext(Dispatchers.Main) { status("Setup failed: ${e.message}") }
             }
         }
     }
 
     private fun updateEngine() {
-        status("Updating yt-dlp engine...")
+        status("Updating engine...")
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 YoutubeDL.getInstance()
@@ -276,11 +304,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun startDownload() {
         if (DownloadService.isRunning) {
-            toast("A download is already running — check the notification")
+            toast("A download is already running")
             return
         }
         if (!Engine.ready) {
-            toast("Engine is still preparing, wait a moment")
+            toast("Still getting ready, wait a moment")
             return
         }
         val url = urlRegex.find(urlInput.text.toString())?.value
@@ -289,20 +317,19 @@ class MainActivity : AppCompatActivity() {
             return
         }
         if (!Net.downloadAllowed(this, dataSwitch.isChecked)) {
-            status("No WiFi. Turn ON the mobile data switch above to download on data.")
+            status("No WiFi. Turn on 'Allow mobile data' to download without it.")
             toast("WiFi not connected")
             return
         }
 
-        val quality = qualities[qualitySpinner.selectedItemPosition]
+        val quality = selectedQuality()
 
-        // Instant local check — no network needed for the common case
         val existing = History.existing(this, url, quality)
         if (existing != null) {
             showFinishedFile(existing)
             AlertDialog.Builder(this)
                 .setTitle("Already downloaded")
-                .setMessage("${existing.name}\n\nIt is already in Download/Video Downloads.")
+                .setMessage("${existing.name}\n\nIt is already saved on your phone.")
                 .setPositiveButton("Play") { _, _ ->
                     History.setLastFile(this, existing)
                     Opener.open(this, existing)
@@ -320,16 +347,16 @@ class MainActivity : AppCompatActivity() {
         val serviceIntent = Intent(this, DownloadService::class.java).apply {
             putExtra("url", url)
             putExtra("quality", quality)
-            putExtra("format", formats[formatSpinner.selectedItemPosition])
-            putExtra("aria2", aria2Check.isChecked)
+            putExtra("format", selectedFormat())
+            putExtra("aria2", aria2Switch.isChecked)
             putExtra("allowData", dataSwitch.isChecked)
             putExtra("force", force)
         }
         ContextCompat.startForegroundService(this, serviceIntent)
 
-        progressBar.progress = 0
+        progressBar.setProgressCompat(0, false)
         resultCard.visibility = View.GONE
-        status("Download started — it keeps running even if you close this app. Progress shows in the notification.")
+        status("Started. It keeps going even if you close the app.")
     }
 
     private fun status(msg: String) {
