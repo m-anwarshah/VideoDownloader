@@ -180,58 +180,41 @@
                     android:layout_height="wrap_content"
                     android:text="Quality" />
 
-                <com.google.android.material.chip.ChipGroup
-                    android:id="@+id/qualityChips"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    app:selectionRequired="true"
-                    app:singleLine="false"
-                    app:singleSelection="true">
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/chipBest"
-                        style="@style/Chip"
-                        android:layout_width="wrap_content"
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/qualityLayout"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:checked="true"
-                        android:text="Best" />
+                        android:layout_weight="1"
+                        android:hint="Video quality"
+                        app:boxCornerRadiusTopStart="14dp"
+                        app:boxCornerRadiusTopEnd="14dp"
+                        app:boxCornerRadiusBottomStart="14dp"
+                        app:boxCornerRadiusBottomEnd="14dp">
 
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/chip1080"
-                        style="@style/Chip"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="1080p" />
-
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/chip720"
-                        style="@style/Chip"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="720p" />
-
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/chip480"
-                        style="@style/Chip"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="480p" />
-
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/chip360"
-                        style="@style/Chip"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="360p" />
+                        <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                            android:id="@+id/qualityDropdown"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="none"
+                            android:textSize="14sp" />
+                    </com.google.android.material.textfield.TextInputLayout>
 
                     <com.google.android.material.chip.Chip
                         android:id="@+id/chipMp3"
                         style="@style/Chip"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="MP3 audio" />
-                </com.google.android.material.chip.ChipGroup>
+                        android:layout_marginStart="10dp"
+                        android:text="MP3" />
+                </LinearLayout>
 
                 <TextView
                     android:id="@+id/formatLabel"
@@ -295,22 +278,6 @@
                     android:textColor="@color/text_secondary"
                     android:textSize="11sp" />
 
-                <com.google.android.material.materialswitch.MaterialSwitch
-                    android:id="@+id/aria2Check"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:checked="true"
-                    android:text="Turbo download"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14sp" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="16 connections at once"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="11sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
