@@ -18,8 +18,11 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
+import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.materialswitch.MaterialSwitch
+import com.google.android.material.textfield.MaterialAutoCompleteTextView
+import com.google.android.material.textfield.TextInputLayout
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.google.android.material.textfield.TextInputEditText
 import com.yausername.youtubedl_android.YoutubeDL
@@ -39,10 +42,11 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var urlInput: TextInputEditText
     private lateinit var pasteBtn: TextView
-    private lateinit var qualityChips: ChipGroup
+    private lateinit var qualityLayout: TextInputLayout
+    private lateinit var qualityDropdown: MaterialAutoCompleteTextView
+    private lateinit var chipMp3: Chip
     private lateinit var formatChips: ChipGroup
     private lateinit var formatLabel: TextView
-    private lateinit var aria2Switch: MaterialSwitch
     private lateinit var dataSwitch: MaterialSwitch
     private lateinit var downloadBtn: MaterialButton
     private lateinit var updateBtn: MaterialButton
@@ -60,6 +64,8 @@ class MainActivity : AppCompatActivity() {
 
     private val urlRegex = Regex("""https?://\S+""")
 
+    private val videoQualities = arrayOf("Best", "1080p", "720p", "480p", "360p")
+
     private var shownFile: File? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -68,10 +74,11 @@ class MainActivity : AppCompatActivity() {
 
         urlInput = findViewById(R.id.urlInput)
         pasteBtn = findViewById(R.id.pasteBtn)
-        qualityChips = findViewById(R.id.qualityChips)
+        qualityLayout = findViewById(R.id.qualityLayout)
+        qualityDropdown = findViewById(R.id.qualityDropdown)
+        chipMp3 = findViewById(R.id.chipMp3)
         formatChips = findViewById(R.id.formatChips)
         formatLabel = findViewById(R.id.formatLabel)
-        aria2Switch = findViewById(R.id.aria2Check)
         dataSwitch = findViewById(R.id.dataSwitch)
         downloadBtn = findViewById(R.id.downloadBtn)
         updateBtn = findViewById(R.id.updateBtn)
@@ -93,9 +100,11 @@ class MainActivity : AppCompatActivity() {
             prefs.edit().putBoolean("allow_data", checked).apply()
         }
 
-        // MP3 has no container choice, so hide the file type row for it
-        qualityChips.setOnCheckedStateChangeListener { _, _ -> syncFormatVisibility() }
-        syncFormatVisibility()
+        qualityDropdown.setSimpleItems(videoQualities)
+        qualityDropdown.setText(videoQualities[0], false)
+        // Picking MP3 makes video quality and container irrelevant
+        chipMp3.setOnCheckedChangeListener { _, _ -> syncAudioMode() }
+        syncAudioMode()
 
         downloadBtn.setOnClickListener { startDownload() }
         updateBtn.setOnClickListener { updateEngine() }
@@ -121,6 +130,7 @@ class MainActivity : AppCompatActivity() {
         DownloadService.progressListener = { pct, line ->
             runOnUiThread { onProgress(pct, line) }
         }
+        setDownloading(DownloadService.isRunning)
         if (DownloadService.isRunning) status("Download running in background...")
         showFinishedFile(DownloadService.completedFile ?: History.lastFile(this))
     }
@@ -132,22 +142,28 @@ class MainActivity : AppCompatActivity() {
 
     // ---------- selection ----------
 
-    private fun selectedQuality(): String = when (qualityChips.checkedChipId) {
-        R.id.chip1080 -> "1080p"
-        R.id.chip720 -> "720p"
-        R.id.chip480 -> "480p"
-        R.id.chip360 -> "360p"
-        R.id.chipMp3 -> "Audio only (MP3)"
-        else -> "Best available"
+    private fun selectedQuality(): String {
+        if (chipMp3.isChecked) return "Audio only (MP3)"
+        val picked = qualityDropdown.text.toString()
+        return if (picked == "Best") "Best available" else picked
     }
 
     private fun selectedFormat(): String =
         if (formatChips.checkedChipId == R.id.chipMkv) "MKV" else "MP4"
 
-    private fun syncFormatVisibility() {
-        val audio = qualityChips.checkedChipId == R.id.chipMp3
+    private fun syncAudioMode() {
+        val audio = chipMp3.isChecked
+        qualityLayout.isEnabled = !audio
+        qualityLayout.alpha = if (audio) 0.4f else 1f
         formatLabel.visibility = if (audio) View.GONE else View.VISIBLE
         formatChips.visibility = if (audio) View.GONE else View.VISIBLE
+    }
+
+    /** Grey out the button so a second tap is impossible while one runs. */
+    private fun setDownloading(running: Boolean) {
+        downloadBtn.isEnabled = !running
+        downloadBtn.alpha = if (running) 0.5f else 1f
+        downloadBtn.text = if (running) "Downloading..." else "Download"
     }
 
     // ---------- progress ----------
@@ -156,11 +172,16 @@ class MainActivity : AppCompatActivity() {
         when (pct) {
             DownloadService.PROGRESS_DUPLICATE -> {
                 val file = File(line)
+                setDownloading(false)
                 status("Already downloaded: ${file.name}")
                 showFinishedFile(file)
             }
-            DownloadService.PROGRESS_FAILED -> status(line.take(140))
+            DownloadService.PROGRESS_FAILED -> {
+                setDownloading(false)
+                status(line.take(140))
+            }
             100 -> {
+                setDownloading(false)
                 progressBar.setProgressCompat(100, true)
                 status(line.take(140))
                 showFinishedFile(DownloadService.completedFile)
@@ -348,7 +369,7 @@ class MainActivity : AppCompatActivity() {
             putExtra("url", url)
             putExtra("quality", quality)
             putExtra("format", selectedFormat())
-            putExtra("aria2", aria2Switch.isChecked)
+            putExtra("aria2", true)   // accelerator always on
             putExtra("allowData", dataSwitch.isChecked)
             putExtra("force", force)
         }
@@ -356,6 +377,7 @@ class MainActivity : AppCompatActivity() {
 
         progressBar.setProgressCompat(0, false)
         resultCard.visibility = View.GONE
+        setDownloading(true)
         status("Started. It keeps going even if you close the app.")
     }
 
